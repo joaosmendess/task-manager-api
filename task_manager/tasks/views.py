@@ -13,8 +13,29 @@ import pickle
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.all()
+    queryset = Task.objects.all()  # Certifique-se de que o queryset esteja presente
     serializer_class = TaskSerializer
+
+    def get_queryset(self):
+        queryset = Task.objects.all()
+        
+        # Filtrar por ID
+        task_id = self.request.query_params.get('id')
+        if task_id:
+            queryset = queryset.filter(id=task_id)
+        
+        # Filtrar por período de datas
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date and end_date:
+            queryset = queryset.filter(date__range=[start_date, end_date])
+        
+        # Filtrar por título (texto composto e palavras parciais)
+        title = self.request.query_params.get('title')
+        if title:
+            queryset = queryset.filter(title__icontains=title)
+        
+        return queryset
 
     def perform_create(self, serializer):
         task = serializer.save()
