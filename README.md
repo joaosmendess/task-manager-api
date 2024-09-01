@@ -101,6 +101,36 @@ Esta é uma API Restful desenvolvida em Django com Django Rest Framework para ge
 
 Você pode testar a API usando ferramentas como Insomnia ou Postman. Todos os endpoints devem estar acessíveis via `http://127.0.0.1:8000/api/`.
 
+**Testes**
+----------
+
+Para garantir que tudo está funcionando corretamente, você pode rodar os testes automatizados que foram configurados para o projeto.
+
+### **Rodando os Testes**
+
+1. **Certifique-se de que o ambiente virtual está ativado**:
+
+    ```bash
+    source venv/bin/activate  # No Windows use: venv\Scripts\activate
+    ```
+
+2. **Execute os testes**:
+
+    ```bash
+    python manage.py test
+    ```
+
+    Isso irá rodar todos os testes configurados e você verá o resultado no terminal.
+
+### **O que os testes cobrem**
+
+- **Criação de Tarefas**: Verifica se a criação de uma nova tarefa também cria um evento correspondente no Google Calendar.
+- **Atualização de Tarefas**: Verifica se a atualização de uma tarefa reflete as mudanças no evento correspondente do Google Calendar.
+- **Exclusão de Tarefas**: Verifica se a exclusão de uma tarefa também remove o evento correspondente do Google Calendar.
+
+Se todos os testes passarem, você verá uma mensagem de "OK". Se algum teste falhar, o terminal exibirá informações detalhadas sobre o erro para ajudá-lo a identificar o problema.
+
+
 **Contribuindo**
 ----------------
 
