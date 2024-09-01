@@ -9,16 +9,16 @@ from google.auth.transport.requests import Request
 import os
 import pickle
 
-
+# Escopo para acesso ao Google Calendar
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 class TaskViewSet(viewsets.ModelViewSet):
-    queryset = Task.objects.all()  # Certifique-se de que o queryset esteja presente
+    queryset = Task.objects.all()  # Configuração do queryset padrão
     serializer_class = TaskSerializer
 
     def get_queryset(self):
         queryset = Task.objects.all()
-        
+
         # Filtrar por ID
         task_id = self.request.query_params.get('id')
         if task_id:
@@ -30,7 +30,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         if start_date and end_date:
             queryset = queryset.filter(date__range=[start_date, end_date])
         
-        # Filtrar por título (texto composto e palavras parciais)
+        # Filtrar por título (considerando texto composto e palavras parciais)
         title = self.request.query_params.get('title')
         if title:
             queryset = queryset.filter(title__icontains=title)
@@ -38,14 +38,15 @@ class TaskViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
+        # Salva a tarefa no banco de dados
         task = serializer.save()
 
-        # Criar evento no Google Calendar
+        # Cria evento no Google Calendar
         creds = None
         if os.path.exists('token.pickle'):
             with open('token.pickle', 'rb') as token:
                 creds = pickle.load(token)
-                
+
         service = build('calendar', 'v3', credentials=creds)
 
         event = {
@@ -68,17 +69,18 @@ class TaskViewSet(viewsets.ModelViewSet):
         task.save()
 
     def update(self, request, *args, **kwargs):
+        # Atualiza a tarefa no banco de dados
         response = super().update(request, *args, **kwargs)
         task = self.get_object()
-        
+
         creds = None
         if os.path.exists('token.pickle'):
             with open('token.pickle', 'rb') as token:
                 creds = pickle.load(token)
-                
+
         service = build('calendar', 'v3', credentials=creds)
 
-        # Atualizar o evento no Google Calendar usando o eventId armazenado
+        # Atualiza o evento no Google Calendar
         if task.google_event_id:
             event = service.events().get(calendarId='primary', eventId=task.google_event_id).execute()
 
@@ -91,23 +93,41 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         return response
 
+    def perform_destroy(self, instance):
+        # Exclui o evento do Google Calendar antes de deletar a tarefa do banco de dados
+        creds = None
+        if os.path.exists('token.pickle'):
+            with open('token.pickle', 'rb') as token:
+                creds = pickle.load(token)
+
+        service = build('calendar', 'v3', credentials=creds)
+
+        if instance.google_event_id:
+            try:
+                service.events().delete(calendarId='primary', eventId=instance.google_event_id).execute()
+            except Exception as e:
+                print(f"Erro ao deletar evento do Google Calendar: {e}")
+
+        # Deleta a tarefa do banco de dados
+        super().perform_destroy(instance)
 
 def google_calendar_auth(request):
     creds = None
-    # O arquivo token.pickle armazena as credenciais do usuário
+    # Carrega as credenciais do usuário a partir do arquivo token.pickle
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
 
-    # Se não houver credenciais válidas, faça o login do usuário
+    # Se não houver credenciais válidas, faz o login do usuário
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=8080)
-        # Salve as credenciais para uso futuro
+        
+        # Salva as credenciais para uso futuro
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
+
     return redirect('/')
