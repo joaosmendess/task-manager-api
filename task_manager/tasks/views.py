@@ -1,8 +1,8 @@
+from django.shortcuts import redirect
 from rest_framework import viewsets
 from googleapiclient.discovery import build
 from .models import Task
 from .serializers import TaskSerializer
-from django.shortcuts import redirect
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -40,7 +40,35 @@ class TaskViewSet(viewsets.ModelViewSet):
             },
         }
 
-        service.events().insert(calendarId='primary', body=event).execute()
+        created_event = service.events().insert(calendarId='primary', body=event).execute()
+        
+        # Armazena o eventId no banco de dados para futuras atualizações
+        task.google_event_id = created_event['id']
+        task.save()
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        task = self.get_object()
+        
+        creds = None
+        if os.path.exists('token.pickle'):
+            with open('token.pickle', 'rb') as token:
+                creds = pickle.load(token)
+                
+        service = build('calendar', 'v3', credentials=creds)
+
+        # Atualizar o evento no Google Calendar usando o eventId armazenado
+        if task.google_event_id:
+            event = service.events().get(calendarId='primary', eventId=task.google_event_id).execute()
+
+            event['summary'] = task.title
+            event['description'] = task.description
+            event['start'] = {'dateTime': f'{task.date}T{task.time}', 'timeZone': 'America/Sao_Paulo'}
+            event['end'] = {'dateTime': f'{task.date}T{task.time}', 'timeZone': 'America/Sao_Paulo'}
+
+            updated_event = service.events().update(calendarId='primary', eventId=task.google_event_id, body=event).execute()
+
+        return response
 
 
 def google_calendar_auth(request):
